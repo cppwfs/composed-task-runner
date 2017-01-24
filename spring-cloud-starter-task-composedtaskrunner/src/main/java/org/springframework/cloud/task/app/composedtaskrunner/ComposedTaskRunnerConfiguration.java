@@ -16,8 +16,6 @@
 
 package org.springframework.cloud.task.app.composedtaskrunner;
 
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,17 +30,19 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.PropertyUtility;
 import org.springframework.cloud.task.configuration.EnableTask;
-import org.springframework.cloud.task.repository.TaskExecution;
 import org.springframework.cloud.task.repository.TaskExplorer;
 import org.springframework.cloud.task.repository.TaskRepository;
 import org.springframework.cloud.task.repository.support.SimpleTaskExplorer;
 import org.springframework.cloud.task.repository.support.SimpleTaskRepository;
 import org.springframework.cloud.task.repository.support.TaskExecutionDaoFactoryBean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -72,6 +72,9 @@ public class ComposedTaskRunnerConfiguration {
 	@Autowired
 	private TaskOperations taskOperations;
 
+	@Autowired
+	private ApplicationContext context;
+
 	@Bean
 	public Job job() throws Exception {
 		//TODO add parser generation of batch flow here
@@ -94,31 +97,29 @@ public class ComposedTaskRunnerConfiguration {
 		return new SimpleTaskExplorer(new TaskExecutionDaoFactoryBean(dataSource));
 	}
 
-	private StepExecutionListener composedTaskStepExecutionListener() {
+	@Bean
+	public StepExecutionListener composedTaskStepExecutionListener() {
 		return new ComposedTaskStepExecutionListener(taskExplorer(), properties);
 	}
 
 	/**
 	 * Creates the step that will launch the TaskLauncherTasklet.
 	 * @param taskName - The name of the task definition to launch.
-	 * @param properties - the properties required for the task to be launched.
+	 * @param taskSpecificProps - the properties required for the task to be launched.
 	 * @param arguments - The command line arguments to be passed to the task.
 	 * @return The step that will be added to the job.
 	 */
-	private Step getStep(String taskName, Map<String, String> properties,
-			List<String> arguments ) {
-		TaskExecution taskExecution = new TaskExecution();
-		taskExecution.setStartTime(new Date());
-		taskExecution.setArguments(new ArrayList());
-		taskExecution = taskRepository().createTaskExecution(taskExecution);
-		TaskLauncherTasklet taskLauncherTasklet = new TaskLauncherTasklet(
-				String.valueOf(taskExecution.getExecutionId()),
-				this.taskOperations, taskName, properties, arguments);
+	public Step getStep(String taskName, Map<String, String> taskSpecificProps,
+			List<String> arguments ) throws Exception {
 
-		return this.steps.get(UUID.randomUUID().toString())
-				.tasklet(taskLauncherTasklet)
-				.listener(composedTaskStepExecutionListener())
-				.build();
+		return stepFactory(taskName, taskSpecificProps,arguments).getObject();
+	}
+
+	public ComposedTaskRunnerStepFactory stepFactory(String taskName,
+			Map<String, String> taskSpecificProps, List<String> arguments) {
+		return new ComposedTaskRunnerStepFactory(taskRepository(), this.taskOperations,
+				taskExplorer(), this.properties, taskName, taskSpecificProps,
+				arguments, this.steps, composedTaskStepExecutionListener());
 	}
 
 }

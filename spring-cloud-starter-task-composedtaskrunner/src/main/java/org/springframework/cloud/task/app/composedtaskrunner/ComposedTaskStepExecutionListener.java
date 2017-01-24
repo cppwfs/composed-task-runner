@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.StepExecutionListener;
+import org.springframework.batch.core.listener.StepExecutionListenerSupport;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
 import org.springframework.cloud.task.repository.TaskExecution;
 import org.springframework.cloud.task.repository.TaskExplorer;
@@ -35,7 +36,7 @@ import org.springframework.util.StringUtils;
  *
  * @author Glenn Renfro
  */
-public class ComposedTaskStepExecutionListener implements StepExecutionListener{
+public class ComposedTaskStepExecutionListener extends StepExecutionListenerSupport{
 
 	private TaskExplorer taskExplorer;
 
@@ -50,17 +51,12 @@ public class ComposedTaskStepExecutionListener implements StepExecutionListener{
 		this.properties = properties;
 	}
 
-	@Override
-	public void beforeStep(StepExecution stepExecution) {
-
-	}
-
 	/**
 	 * Waits for the TaskExecution for the step to complete up until a timeout.
 	 * If the timeout as established in the ComposedTaskProperties is exceeded
 	 * then the exit status will be UNKNOWN.  If an exitMessage is returned
 	 * by the TaskExecution then the exit status returned will be the
-	 * exitMessage.  If no exitMessage is set for the task execution and the
+	 * ExitStatus.  If no exitMessage is set for the task execution and the
 	 * task returns an exitCode ! = to zero an exit status of FAILED is
 	 * returned.  If no exit message is set and the exit code of the task is
 	 * zero then the ExitStatus of COMPLETED is returned.
@@ -78,44 +74,20 @@ public class ComposedTaskStepExecutionListener implements StepExecutionListener{
 				"return a task-execution-id.  Check to see if task " +
 				"exists.");
 
-		boolean waitStatus = waitForTaskToComplete(executionId);
-		if(!waitStatus) {
-			result = ExitStatus.UNKNOWN;
-		}
-		else {
 			TaskExecution resultExecution = taskExplorer.getTaskExecution(Long.valueOf(executionId));
-			if(!StringUtils.isEmpty(resultExecution.getExitMessage())) {
+			if(resultExecution.getEndTime() == null) {
+				result = ExitStatus.UNKNOWN;
+			}
+			else if(!StringUtils.isEmpty(resultExecution.getExitMessage())) {
 				result = new ExitStatus(resultExecution.getExitMessage());
 			}
 			else if(resultExecution.getExitCode() != 0) {
 				result = ExitStatus.FAILED;
 			}
-		}
 		logger.info(String.format("AfterStep processing complete for " +
 						"stepExecution %s with taskExecution %s",
 				stepExecution.getStepName(), executionId));
 		return result;
 	}
 
-	private boolean waitForTaskToComplete(String taskExecutionId) {
-		long timeout = System.currentTimeMillis() + (
-				properties.getMaxWaitTime());
-		boolean isComplete = false;
-		while (!isComplete && System.currentTimeMillis() < timeout) {
-			try {
-				Thread.sleep(properties.getIntervalTimeBetweenChecks());
-			}
-			catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				throw new IllegalStateException(e.getMessage(), e);
-			}
-			TaskExecution taskExecution =
-					taskExplorer.getTaskExecution(Long.valueOf(taskExecutionId));
-			if(taskExecution != null && taskExecution.getEndTime() != null) {
-				isComplete = true;
-			}
-
-		}
-		return isComplete;
-	}
 }

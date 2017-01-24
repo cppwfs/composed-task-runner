@@ -29,6 +29,9 @@ import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
+import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
+import org.springframework.cloud.task.repository.TaskExecution;
+import org.springframework.cloud.task.repository.TaskExplorer;
 import org.springframework.util.Assert;
 
 /**
@@ -38,6 +41,10 @@ import org.springframework.util.Assert;
  * @author Glenn Renfro
  */
 public class TaskLauncherTasklet implements Tasklet {
+
+	private ComposedTaskProperties taskProperties;
+
+	private TaskExplorer taskExplorer;
 
 	private TaskOperations taskOperations;
 
@@ -51,10 +58,14 @@ public class TaskLauncherTasklet implements Tasklet {
 
 	private String taskExecutionId;
 
-	public TaskLauncherTasklet(String taskExecutionId, TaskOperations taskOperations, String taskName,
+	public TaskLauncherTasklet(String taskExecutionId,
+			TaskOperations taskOperations, TaskExplorer taskExplorer,
+			ComposedTaskProperties taskProperties, String taskName,
 			Map<String, String> properties, List<String> arguments) {
 		Assert.hasText(taskName, "taskName must not be empty nor null.");
 		Assert.notNull(taskOperations, "taskOperations must not be null.");
+		Assert.notNull(taskExplorer, "taskExplorer must not be null.");
+		Assert.notNull(taskProperties, "taskProperties must not be null");
 
 		this.taskName = taskName;
 		if (properties == null) {
@@ -72,6 +83,8 @@ public class TaskLauncherTasklet implements Tasklet {
 		this.arguments.add("--spring.cloud.task.executionid=" + taskExecutionId);
 		this.taskExecutionId = taskExecutionId;
 		this.taskOperations = taskOperations;
+		this.taskExplorer = taskExplorer;
+		this.taskProperties = taskProperties;
 	}
 
 	/**
@@ -88,7 +101,31 @@ public class TaskLauncherTasklet implements Tasklet {
 		taskOperations.launch(taskName, this.properties, this.arguments);
 		chunkContext.getStepContext().getStepExecution().getExecutionContext()
 				.put("task-execution-id", this.taskExecutionId);
+		waitForTaskToComplete(this.taskExecutionId);
 		return RepeatStatus.FINISHED;
+	}
+
+	private boolean waitForTaskToComplete(String taskExecutionId) {
+		long timeout = System.currentTimeMillis() + (
+				taskProperties.getMaxWaitTime());
+		boolean isComplete = false;
+		while (!isComplete && System.currentTimeMillis() < timeout) {
+			try {
+				Thread.sleep(taskProperties.getIntervalTimeBetweenChecks());
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException(e.getMessage(), e);
+			}
+			TaskExecution taskExecution =
+					taskExplorer.getTaskExecution(Long.valueOf(taskExecutionId));
+			System.out.println(taskExecution.toString());
+			if(taskExecution != null && taskExecution.getEndTime() != null) {
+				isComplete = true;
+			}
+
+		}
+		return isComplete;
 	}
 
 }

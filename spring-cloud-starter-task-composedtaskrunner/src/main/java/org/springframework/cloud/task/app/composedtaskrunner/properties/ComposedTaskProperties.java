@@ -36,7 +36,7 @@ public class ComposedTaskProperties {
 	 * The amount of time in millis that the ComposedTaskStepExecutionListener
 	 * will wait between checks of the database to see if a task has completed.
 	 */
-	private int intervalTimeBetweenChecks = 500;
+	private int intervalTimeBetweenChecks = 2000;
 
 	/**
 	 * The URI for the dataflow server that will receive task launch requests.

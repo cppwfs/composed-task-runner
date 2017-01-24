@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+	<modelVersion>4.0.0</modelVersion>
 
-    <artifactId>composedtaskrunner-task-app-dependencies</artifactId>
-    <version>1.1.1.BUILD-SNAPSHOT</version>
-    <packaging>pom</packaging>
-    <name>Composed Task Runner Task App Dependencies</name>
-    <description>Dependencies for Spring Cloud Task Composed Task Runner App Starter</description>
+	<artifactId>composedtaskrunner-task-app-dependencies</artifactId>
+	<version>1.1.1.BUILD-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>Composed Task Runner Task App Dependencies</name>
+	<description>Dependencies for Spring Cloud Task Composed Task Runner App Starter</description>
 
 	<properties>
 		<spring-cloud-task.version>1.1.2.RELEASE</spring-cloud-task.version>
 		<spring-cloud-dataflow-rest-client.version>1.2.0.BUILD-SNAPSHOT</spring-cloud-dataflow-rest-client.version>
 	</properties>
-    <parent>
-        <groupId>org.springframework.cloud.task.app</groupId>
-        <artifactId>task-app-starters-core-dependencies</artifactId>
-        <version>1.1.1.BUILD-SNAPSHOT</version>
-    </parent>
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.cloud.task.app</groupId>
-                <artifactId>spring-cloud-starter-task-composedtaskrunner</artifactId>
-                <version>1.1.1.BUILD-SNAPSHOT</version>
-            </dependency>
+	<parent>
+		<groupId>org.springframework.cloud.task.app</groupId>
+		<artifactId>task-app-starters-core-dependencies</artifactId>
+		<version>1.1.1.BUILD-SNAPSHOT</version>
+	</parent>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud.task.app</groupId>
+				<artifactId>spring-cloud-starter-task-composedtaskrunner</artifactId>
+				<version>1.1.1.BUILD-SNAPSHOT</version>
+			</dependency>
 			<dependency>
 				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-task-core</artifactId>
+				<artifactId>spring-cloud-starter-task</artifactId>
 				<version>${spring-cloud-task.version}</version>
 			</dependency>
 			<dependency>
@@ -35,8 +35,8 @@
 				<version>${spring-cloud-dataflow-rest-client.version}</version>
 			</dependency>
 		</dependencies>
-    </dependencyManagement>
-<profiles>
+	</dependencyManagement>
+	<profiles>
 		<profile>
 			<id>spring</id>
 			<repositories>

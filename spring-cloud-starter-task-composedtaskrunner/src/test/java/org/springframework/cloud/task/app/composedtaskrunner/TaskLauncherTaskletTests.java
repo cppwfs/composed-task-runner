@@ -17,11 +17,13 @@
 package org.springframework.cloud.task.app.composedtaskrunner;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 
+import com.sun.javafx.tk.Toolkit;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,7 +46,9 @@ import org.springframework.cloud.dataflow.rest.client.DataFlowClientException;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
 import org.springframework.cloud.task.repository.TaskExecution;
+import org.springframework.cloud.task.repository.TaskExplorer;
 import org.springframework.cloud.task.repository.TaskRepository;
+import org.springframework.cloud.task.repository.support.SimpleTaskExplorer;
 import org.springframework.cloud.task.repository.support.SimpleTaskRepository;
 import org.springframework.cloud.task.repository.support.TaskExecutionDaoFactoryBean;
 import org.springframework.cloud.task.repository.support.TaskRepositoryInitializer;
@@ -58,6 +62,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.web.client.ResourceAccessException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -90,6 +95,8 @@ public class TaskLauncherTaskletTests {
 
 	private TaskRepository taskRepository;
 
+	private TaskExplorer taskExplorer;
+
 
 	@Before
 	public void setup() throws Exception{
@@ -100,13 +107,14 @@ public class TaskLauncherTaskletTests {
 		TaskExecutionDaoFactoryBean taskExecutionDaoFactoryBean =
 				new TaskExecutionDaoFactoryBean(dataSource);
 		taskRepository = new SimpleTaskRepository(taskExecutionDaoFactoryBean);
-
+		taskExplorer = new SimpleTaskExplorer(taskExecutionDaoFactoryBean);
 	}
 
 	@Test
 	@DirtiesContext
 	public void testTaskLauncherTasklet() throws Exception{
-		TaskLauncherTasklet taskLauncherTasklet = getTaskExecutionTasklet();
+		TaskLauncherTasklet taskLauncherTasklet =
+				getTaskExecutionTasklet(getCompleteTaskExecution());
 		ChunkContext chunkContext = chunkContext();
 		taskLauncherTasklet.execute(null, chunkContext);
 		assertEquals("1", chunkContext.getStepContext()
@@ -114,14 +122,27 @@ public class TaskLauncherTaskletTests {
 				.get("task-execution-id"));
 
 		chunkContext = chunkContext();
-		taskLauncherTasklet = getTaskExecutionTasklet();
+		taskLauncherTasklet = getTaskExecutionTasklet(getCompleteTaskExecution());
 		taskLauncherTasklet.execute(null, chunkContext);
 		assertEquals("2", chunkContext.getStepContext()
 				.getStepExecution().getExecutionContext()
 				.get("task-execution-id"));
 	}
-
 	@Test
+	@DirtiesContext
+	public void testTaskLauncherTaskletTimeout() throws Exception {
+		this.composedTaskProperties.setMaxWaitTime(1000);
+		TaskLauncherTasklet taskLauncherTasklet = getTaskExecutionTasklet();
+		ChunkContext chunkContext = chunkContext();
+		taskLauncherTasklet.execute(null, chunkContext);
+		long taskExecutionId = Long.valueOf((String)chunkContext.getStepContext()
+				.getStepExecution().getExecutionContext()
+				.get("task-execution-id"));
+		assertEquals(1, taskExecutionId);
+		TaskExecution taskExecution = taskExplorer.getTaskExecution(taskExecutionId);
+		assertNull(taskExecution.getExitMessage());
+	}
+		@Test
 	@DirtiesContext
 	public void testInvalidTaskName() throws Exception {
 		String exceptionMessage = null;
@@ -162,10 +183,22 @@ public class TaskLauncherTaskletTests {
 		assertEquals(ERROR_MESSAGE, exceptionMessage);
 	}
 
+	private TaskExecution getCompleteTaskExecution() {
+		TaskExecution taskExecution = taskRepository.createTaskExecution();
+		taskRepository.completeTaskExecution(taskExecution.getExecutionId(),
+				0, new Date(), "");
+		return taskExecution;
+	}
+
 	private TaskLauncherTasklet getTaskExecutionTasklet() {
 		TaskExecution taskExecution = taskRepository.createTaskExecution();
+		return getTaskExecutionTasklet(taskExecution);
+	}
+
+	private TaskLauncherTasklet getTaskExecutionTasklet(TaskExecution taskExecution) {
 		return new TaskLauncherTasklet(
 				String.valueOf(taskExecution.getExecutionId()), taskOperations,
+				taskExplorer, composedTaskProperties,
 				TASK_NAME, new HashMap<String,String>(), new ArrayList<String>());
 	}
 
