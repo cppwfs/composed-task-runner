@@ -33,6 +33,7 @@ import org.springframework.cloud.task.app.composedtaskrunner.properties.Composed
 import org.springframework.cloud.task.repository.TaskExecution;
 import org.springframework.cloud.task.repository.TaskExplorer;
 import org.springframework.cloud.task.repository.TaskRepository;
+import org.springframework.core.env.Environment;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
 import org.springframework.transaction.interceptor.TransactionAttribute;
@@ -49,7 +50,7 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 
 	private TaskExplorer taskExplorer;
 
-	private ComposedTaskProperties composedTaskProperties;
+	private Environment environment;
 
 	private String taskName;
 
@@ -65,13 +66,13 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 
 	public ComposedTaskRunnerStepFactory(TaskRepository taskRepository,
 			TaskOperations taskOperations, TaskExplorer taskExplorer,
-			ComposedTaskProperties composedTaskProperties, String taskName,
+			Environment environment, String taskName,
 			Map<String, String> taskSpecificProps, List<String> arguments,
 			StepExecutionListener composedTaskStepExecutionListener) {
 		Assert.notNull(taskRepository, "taskRepository must not be null");
 		Assert.notNull(taskExplorer, "taskExplorer must not be null");
 		Assert.notNull(taskOperations, "taskOperation must not be null");
-		Assert.notNull(composedTaskProperties, "composedTaskProperties must not be null");
+		Assert.notNull(environment, "environment must not be null");
 		Assert.hasText(taskName, "taskName must not be empty nor null");
 		Assert.notNull(taskSpecificProps, "taskSpecificProps must not be null");
 		Assert.notNull(composedTaskStepExecutionListener, "composedTaskStepExecutionListener must not be null");
@@ -79,7 +80,7 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 		this.taskRepository = taskRepository;
 		this.taskOperations = taskOperations;
 		this.taskExplorer = taskExplorer;
-		this.composedTaskProperties = composedTaskProperties;
+		this.environment = environment;
 		this.taskName = taskName;
 		this.taskSpecificProps = taskSpecificProps;
 		this.arguments = arguments;
@@ -95,7 +96,7 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 		TaskLauncherTasklet taskLauncherTasklet = new TaskLauncherTasklet(
 				String.valueOf(taskExecution.getExecutionId()),
 				this.taskOperations, this.taskExplorer,
-				this.composedTaskProperties, this.taskName, this.taskSpecificProps,
+				this.environment, this.taskName, this.taskSpecificProps,
 				this.arguments);
 		String stepName = UUID.randomUUID().toString();
 		Step step = this.steps.get(stepName)

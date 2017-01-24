@@ -78,6 +78,11 @@ public class DataFlowTestConfiguration {
 			return null;
 		}
 
+		@Override
+		public void cleanup(long l) {
+
+		}
+
 		public boolean isLaunched() {
 			return isLaunched;
 		}

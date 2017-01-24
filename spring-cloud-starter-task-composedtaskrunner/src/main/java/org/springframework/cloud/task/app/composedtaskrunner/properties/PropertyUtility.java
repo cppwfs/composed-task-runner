@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
 
 /**
@@ -45,10 +46,10 @@ public class PropertyUtility {
 	 * @param properties The list of properties to search
 	 * @return Map containing the properties for the task.
 	 */
-	public static Map<String, String> getPropertiesForTask(String taskName, ComposedTaskProperties properties) {
+	public static Map<String, String> getPropertiesForTask(String taskName, Environment environment) {
 		String appPrefix = String.format("app.%s.", taskName);
 		Map<String, String> deploymentProperties = new HashMap<>();
-		for (Map.Entry<String, String> entry : getAllProperties(properties).entrySet()) {
+		for (Map.Entry<String, String> entry : getAllProperties(environment).entrySet()) {
 			if (entry.getKey().startsWith(appPrefix)) {
 				deploymentProperties.put(entry.getKey().substring(appPrefix.length()), entry.getValue());
 			}
@@ -56,20 +57,19 @@ public class PropertyUtility {
 		return deploymentProperties;
 	}
 
-	private static  Map<String, String> getAllProperties(ComposedTaskProperties properties) {
+	private static  Map<String, String> getAllProperties(Environment environment) {
 		Map<String, String> deploymentProperties = new HashMap<String, String>();
-		if (!StringUtils.isEmpty(properties.getComposedTaskProperties())) {
+		String composedTaskProperties = environment.getProperty("composedTaskProperties");
+		if (!StringUtils.isEmpty(composedTaskProperties)) {
 			Matcher matcher = DEPLOYMENT_PROPERTIES_PATTERN.matcher(
-					properties.getComposedTaskProperties());
+					composedTaskProperties);
 			int start = 0;
 			while (matcher.find()) {
-				addKeyValuePairAsProperty(properties.
-						getComposedTaskProperties().substring(start,
+				addKeyValuePairAsProperty(composedTaskProperties.substring(start,
 						matcher.start()), deploymentProperties);
 				start = matcher.start() + 1;
 			}
-			addKeyValuePairAsProperty(properties.
-							getComposedTaskProperties().substring(start),
+			addKeyValuePairAsProperty(composedTaskProperties.substring(start),
 					deploymentProperties);
 		}
 		return deploymentProperties;

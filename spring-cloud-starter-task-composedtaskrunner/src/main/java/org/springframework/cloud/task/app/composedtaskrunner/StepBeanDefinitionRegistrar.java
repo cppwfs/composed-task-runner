@@ -19,42 +19,47 @@ package org.springframework.cloud.task.app.composedtaskrunner;
 
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.PropertyUtility;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
+import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotationMetadata;
 
 /**
  * Created by glennrenfro on 1/24/17.
  */
-public class StepBeanDefinitionRegistrar implements ImportBeanDefinitionRegistrar {
+public class StepBeanDefinitionRegistrar implements ImportBeanDefinitionRegistrar, EnvironmentAware {
 
-	@Autowired
-	private ComposedTaskProperties properties;
+	private Environment env;
 
 	@Override
 	public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
+
+		System.out.println("env = " + env);
 
 		BeanDefinitionBuilder builder = BeanDefinitionBuilder.rootBeanDefinition(ComposedTaskRunnerStepFactory.class);
 
 		builder.addConstructorArgReference("taskRepository");
 		builder.addConstructorArgReference("taskOperations");
 		builder.addConstructorArgReference("taskExplorer");
-		builder.addConstructorArgValue(this.properties);
-		String taskName = this.properties.getGraph();
+		builder.addConstructorArgValue(this.env);
+		String taskName = this.env.getProperty("graph");
+		System.out.println(">> graph = " + taskName);
 		builder.addConstructorArgValue(taskName);
 		builder.addConstructorArgValue(
-				PropertyUtility.getPropertiesForTask(properties.getGraph(),
-				this.properties));
+				PropertyUtility.getPropertiesForTask(taskName,
+				this.env));
 		builder.addConstructorArgValue(null);
 		builder.addConstructorArgReference("composedTaskStepExecutionListener");
 
-		registry.registerBeanDefinition(taskName + UUID.randomUUID(), builder.getBeanDefinition());
+//		registry.registerBeanDefinition(taskName + UUID.randomUUID(), builder.getBeanDefinition());
+		registry.registerBeanDefinition("foo" + UUID.randomUUID(), builder.getBeanDefinition());
+	}
+
+	@Override
+	public void setEnvironment(Environment environment) {
+		this.env = environment;
 	}
 }
