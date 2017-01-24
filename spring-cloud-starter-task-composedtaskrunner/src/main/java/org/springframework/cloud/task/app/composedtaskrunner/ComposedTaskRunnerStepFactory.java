@@ -27,6 +27,7 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.StepExecutionListener;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
 import org.springframework.cloud.task.repository.TaskExecution;
@@ -56,6 +57,7 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 
 	private List<String> arguments;
 
+	@Autowired
 	private StepBuilderFactory steps;
 
 	StepExecutionListener composedTaskStepExecutionListener;
@@ -65,7 +67,6 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 			TaskOperations taskOperations, TaskExplorer taskExplorer,
 			ComposedTaskProperties composedTaskProperties, String taskName,
 			Map<String, String> taskSpecificProps, List<String> arguments,
-			StepBuilderFactory steps,
 			StepExecutionListener composedTaskStepExecutionListener) {
 		Assert.notNull(taskRepository, "taskRepository must not be null");
 		Assert.notNull(taskExplorer, "taskExplorer must not be null");
@@ -73,7 +74,6 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 		Assert.notNull(composedTaskProperties, "composedTaskProperties must not be null");
 		Assert.hasText(taskName, "taskName must not be empty nor null");
 		Assert.notNull(taskSpecificProps, "taskSpecificProps must not be null");
-		Assert.notNull(steps, "steps must not be null");
 		Assert.notNull(composedTaskStepExecutionListener, "composedTaskStepExecutionListener must not be null");
 
 		this.taskRepository = taskRepository;
@@ -83,7 +83,6 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 		this.taskName = taskName;
 		this.taskSpecificProps = taskSpecificProps;
 		this.arguments = arguments;
-		this.steps = steps;
 		this.composedTaskStepExecutionListener = composedTaskStepExecutionListener;
 	}
 
@@ -131,6 +130,6 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 
 	@Override
 	public boolean isSingleton() {
-		return false;
+		return true;
 	}
 }

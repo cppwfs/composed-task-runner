@@ -42,7 +42,7 @@ import static org.junit.Assert.assertTrue;
 @ContextConfiguration(classes={EmbeddedDataSourceConfiguration.class,
 		TaskLauncherTaskletTests.TestConfiguration.class,
 		PropertyPlaceholderAutoConfiguration.class,
-		DataFlowTestConfiguration.class,
+		DataFlowTestConfiguration.class,StepBeanDefinitionRegistrar.class,
 		ComposedTaskRunnerConfiguration.class})
 @TestPropertySource(properties = {"graph=COMPOSED_TEST","maxWaitTime=1000"})
 public class ComposedTaskRunnerConfigurationTests {

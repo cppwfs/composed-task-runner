@@ -45,6 +45,7 @@ import org.springframework.cloud.task.repository.support.TaskExecutionDaoFactory
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 
 /**
  * Configures the Job that will execute the Composed Task Execution.
@@ -55,6 +56,7 @@ import org.springframework.context.annotation.Configuration;
 @EnableBatchProcessing
 @EnableTask
 @EnableConfigurationProperties(ComposedTaskProperties.class)
+@Import(StepBeanDefinitionRegistrar.class)
 public class ComposedTaskRunnerConfiguration {
 
 	@Autowired
@@ -79,9 +81,7 @@ public class ComposedTaskRunnerConfiguration {
 	public Job job() throws Exception {
 		//TODO add parser generation of batch flow here
 		FlowBuilder<Flow> flowBuilder = new FlowBuilder<Flow>(UUID.randomUUID().toString())
-				.start(getStep(properties.getGraph(),
-						PropertyUtility.getPropertiesForTask(properties.getGraph(),
-								this.properties), null));//for now assumes single step until we get parser to build out the flow.
+				.start(context.getBean(Step.class));//for now assumes single step until we get parser to build out the flow.
 		return this.jobs.get(
 				properties.getJobNamePrefix() + UUID.randomUUID().toString())
 				.start(flowBuilder.end()).end().build();
@@ -102,24 +102,24 @@ public class ComposedTaskRunnerConfiguration {
 		return new ComposedTaskStepExecutionListener(taskExplorer(), properties);
 	}
 
-	/**
-	 * Creates the step that will launch the TaskLauncherTasklet.
-	 * @param taskName - The name of the task definition to launch.
-	 * @param taskSpecificProps - the properties required for the task to be launched.
-	 * @param arguments - The command line arguments to be passed to the task.
-	 * @return The step that will be added to the job.
-	 */
-	public Step getStep(String taskName, Map<String, String> taskSpecificProps,
-			List<String> arguments ) throws Exception {
-
-		return stepFactory(taskName, taskSpecificProps,arguments).getObject();
-	}
-
-	public ComposedTaskRunnerStepFactory stepFactory(String taskName,
-			Map<String, String> taskSpecificProps, List<String> arguments) {
-		return new ComposedTaskRunnerStepFactory(taskRepository(), this.taskOperations,
-				taskExplorer(), this.properties, taskName, taskSpecificProps,
-				arguments, this.steps, composedTaskStepExecutionListener());
-	}
+//	/**
+//	 * Creates the step that will launch the TaskLauncherTasklet.
+//	 * @param taskName - The name of the task definition to launch.
+//	 * @param taskSpecificProps - the properties required for the task to be launched.
+//	 * @param arguments - The command line arguments to be passed to the task.
+//	 * @return The step that will be added to the job.
+//	 */
+//	public Step getStep(String taskName, Map<String, String> taskSpecificProps,
+//			List<String> arguments ) throws Exception {
+//
+//		return stepFactory(taskName, taskSpecificProps,arguments).getObject();
+//	}
+//
+//	public ComposedTaskRunnerStepFactory stepFactory(String taskName,
+//			Map<String, String> taskSpecificProps, List<String> arguments) {
+//		return new ComposedTaskRunnerStepFactory(taskRepository(), this.taskOperations,
+//				taskExplorer(), this.properties, taskName, taskSpecificProps,
+//				arguments, this.steps, composedTaskStepExecutionListener());
+//	}
 
 }
