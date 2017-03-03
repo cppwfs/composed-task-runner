@@ -21,51 +21,74 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 import java.util.UUID;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.dataflow.core.dsl.ComposedTaskVisitor;
 import org.springframework.cloud.dataflow.core.dsl.Flow;
+import org.springframework.cloud.dataflow.core.dsl.LabelledComposedTaskNode;
 import org.springframework.cloud.dataflow.core.dsl.Split;
 import org.springframework.cloud.dataflow.core.dsl.TaskApp;
 import org.springframework.cloud.dataflow.core.dsl.Transition;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
-import org.springframework.util.StringUtils;
 
 /**
- * @author Glenn Renfro
+ * Creates the Job Flow based on the ComposedTaskVisitor implementation
+ * provided by the TaskParser in Spring Cloud Data Flow.
+ *
+ * @author Glenn Renfro.
  */
 public class ComposedRunnerVisitor extends ComposedTaskVisitor {
-
-	@Autowired
-	private ApplicationContext context;
 
 	private FlowBuilder<org.springframework.batch.core.job.flow.Flow> flowBuilder;
 
 	private boolean isInitialized = false;
 
-	private boolean isSplit = false;
-	private boolean isFirstSplit = false;
-
-	private List<org.springframework.batch.core.job.flow.Flow> flows = new ArrayList<>();;
-	private Step currentStep;
-	private Step transitionStep;
 	private Map<String, Integer> taskBeanSuffixes = new HashMap<>();
 
+	private Stack flowStack= new Stack();
+
+	@Autowired
+	private ApplicationContext context;
+
+	private static final Log logger = LogFactory.getLog(ComposedRunnerVisitor.class);
+
+	public ComposedRunnerVisitor() {
+		initialize();
+	}
+
 	/**
-	 * @param sequenceNumber, where the primary sequence is 0
+	 * The first call made to a visitor.
+	 */
+	public void startVisit() {
+		logger.debug("Start Visit");
+	}
+
+	/**
+	 * The last call made to a visitor.
+	 */
+	public void endVisit() {
+		logger.debug("End Visit");
+	}
+
+	/**
+	 * @param firstNode the sequence number, where the primary sequence is 0
 	 * @return false to skip visiting the specified sequence
 	 */
-	public boolean preVisit(int sequenceNumber) {
-		System.out.println("previsit" + sequenceNumber);
+	public boolean preVisitSequence(LabelledComposedTaskNode firstNode, int sequenceNumber) {
+		logger.debug("Pre Visit Sequence");
 		return true;
 	}
 
-	public void postVisit(int sequenceNumber) {
-		System.out.println("postVisit" + sequenceNumber);
+	public void postVisitSequence(LabelledComposedTaskNode firstNode, int sequenceNumber) {
+		logger.debug("Post Visit Sequence");
 	}
 
 	/**
@@ -73,16 +96,41 @@ public class ComposedRunnerVisitor extends ComposedTaskVisitor {
 	 * @return false to skip visiting this flow
 	 */
 	public boolean preVisit(Flow flow) {
-		System.out.println("previsit Flow " + flow.toString());
+		logger.debug("Pre Visit Flow:  " + flow);
+		flowStack.push(new FlowMarker(FlowMarker.FlowMarkerType.FLOW, flow.toString()));
 		return true;
 	}
 
 	public void visit(Flow flow) {
-		System.out.println("Visit Flow " + flow.toString());
+		logger.debug("Visit Flow:  " + flow);
+
 	}
 
 	public void postVisit(Flow flow) {
-		System.out.println("postVisit Flow " + flow.toString());
+		logger.debug("Post Visit Flow:  " + flow);
+		Stack executionStack = new Stack();
+		FlowBuilder<org.springframework.batch.core.job.flow.Flow> taskAppFlowBuilder =
+				new FlowBuilder("Flow" + UUID.randomUUID().toString());
+		while (!flowStack.isEmpty()) {
+			if (flowStack.peek() instanceof FlowMarker) {
+				flowStack.pop();// pop off marker
+				boolean isFirst = true;
+				while (!executionStack.isEmpty()){
+					if(isFirst){
+						taskAppFlowBuilder.start((org.springframework.batch.core.job.flow.Flow) executionStack.pop());
+						isFirst = false;
+					}
+					else {
+						taskAppFlowBuilder.next((org.springframework.batch.core.job.flow.Flow) executionStack.pop());
+					}
+				}
+				break;
+			}
+			else {
+				executionStack.push(flowStack.pop());
+			}
+		}
+		flowStack.push(taskAppFlowBuilder.end());
 	}
 
 	/**
@@ -90,33 +138,40 @@ public class ComposedRunnerVisitor extends ComposedTaskVisitor {
 	 * @return false to skip visiting this split
 	 */
 	public boolean preVisit(Split split) {
-		isSplit = true;
-		System.out.println("previsit split " + split.toString());
-
+		logger.debug("Pre Visit Split:  " + split);
+		flowStack.push(new FlowMarker(FlowMarker.FlowMarkerType.SPLIT, split.toString()));
 		return true;
 	}
 
 	public void visit(Split split) {
-		System.out.println("visit split " + split.toString());
-
+		logger.debug("Visit Split:  " + split);
 	}
 
 	public void postVisit(Split split) {
+		logger.debug("Post Visit Split:  " + split);
+		Stack executionStack = new Stack();
+		FlowBuilder<org.springframework.batch.core.job.flow.Flow> taskAppFlowBuilder =
+				new FlowBuilder("Flow" + UUID.randomUUID().toString());
+		List<org.springframework.batch.core.job.flow.Flow> flows = new ArrayList<>();
+		while (!flowStack.isEmpty()) {
+			if (flowStack.peek() instanceof FlowMarker) {
+				flowStack.pop(); //Remove Marker
+				while (!executionStack.isEmpty()){
+					flows.add((org.springframework.batch.core.job.flow.Flow) executionStack.pop());
+				}
+				break;
+			}
+			else {
+				executionStack.push(flowStack.pop());
+			}
+		}
 		org.springframework.batch.core.job.flow.Flow splitFlow =
 				new FlowBuilder.SplitBuilder<>(
-				new FlowBuilder<org.springframework.batch.core.job.flow.Flow>(UUID.randomUUID().toString()),
-				new SimpleAsyncTaskExecutor())
-				.add(flows.toArray(new org.springframework.batch.core.job.flow.Flow[flows.size()])).build();
-		if(isFirstSplit) {
-			flowBuilder.start(splitFlow);
-		}
-		else {
-			flowBuilder.next(splitFlow);
-		}
-		isSplit = false;
-		isFirstSplit = false;
-		System.out.println("postvisit split " + split.toString());
-		flows = new ArrayList<>();
+						new FlowBuilder<org.springframework.batch.core.job.flow.Flow>(UUID.randomUUID().toString()),
+						new SimpleAsyncTaskExecutor())
+						.add(flows.toArray(new org.springframework.batch.core.job.flow.Flow[flows.size()])).build();
+
+		flowStack.push(taskAppFlowBuilder.next(splitFlow).end());
 	}
 
 
@@ -128,81 +183,56 @@ public class ComposedRunnerVisitor extends ComposedTaskVisitor {
 	 * @return false to skip visiting this taskApp
 	 */
 	public boolean preVisit(TaskApp taskApp) {
-		System.out.println("previsit taskApp " + taskApp.getName());
+		logger.debug("Pre Visit taskApp:  " + taskApp);
 		return true;
 	}
 
 	public void visit(TaskApp taskApp) {
-		String taskName;
-		boolean isLabel = false;
-		if(taskApp.getLabel() != null) {
-			taskName = taskApp.getLabel().stringValue();
-			isLabel = true;
+		logger.debug("Visit taskApp:  " + taskApp);
+		String beanName = getBeanName(taskApp);
+		Step currentStep = context.getBean(beanName, Step.class);
+		org.springframework.batch.core.job.flow.Flow taskAppFlow;
+		if(taskApp.getTransitions() != null  && !taskApp.getTransitions().isEmpty()) {
+			taskAppFlow = getTransitionFlow(beanName, currentStep, taskApp.getTransitions());
+			flowStack.push(taskAppFlow);
 		}
 		else {
-			taskName = taskApp.getName();
+			taskAppFlow = new
+					FlowBuilder<org.springframework.batch.core.job.flow.Flow>(beanName)
+							.from(currentStep).end();
+			flowStack.push(taskAppFlow);
 		}
-		currentStep = context.getBean(getBeanName(taskName, isLabel), Step.class);
-		if(!isInitialized) {
-			initialize();
-			if(isSplit) {
-				isFirstSplit = true;
-				flows.add(new FlowBuilder<org.springframework.batch.core.job.flow.Flow>(getBeanName(taskName, isLabel))
-						.from(currentStep).end());
-			}
-			else {
-				flowBuilder
-						.start(currentStep);
-			}
-		} else {
-			if(isSplit) {
-				flows.add(new FlowBuilder<org.springframework.batch.core.job.flow.Flow>(getBeanName(taskName, isLabel))
-						.from(currentStep).end());
-			}
-			else {
-				flowBuilder.next(currentStep);
-			}
-		}
-		System.out.println("visit taskapp " + taskApp.toString());
 
 	}
 
 	public void postVisit(TaskApp taskApp) {
-		if (transitionStep != null) {
-			flowBuilder.from(transitionStep);
-		}
-		transitionStep = null;
-		System.out.println("postvisit taskapp " + taskApp.getName());
+		logger.debug("Post Visit taskApp:  " + taskApp);
 	}
 
+
+	/**
+	 * After <tt>visit(TaskApp)</tt> and before <tt>postVisit(TaskApp)</tt> the transitions (if there
+	 * are any) are visited for that task app.
+	 * @param transition the transition
+	 * @return false to skip visiting this transition
+	 */
 	public boolean preVisit(Transition transition) {
-		System.out.println("previsit transition " + transition.getTargetApp());
+		logger.debug("Pre Visit transition:  " + transition);
 		return true;
 	}
 
 	public void visit(Transition transition) {
-		System.out.println("visit transition " + transition.getTargetApp());
-		String targetName;
-		boolean isLabel = false;
-		if(transition.getTargetLabel() != null) {
-			targetName = transition.getTargetLabel();
-			isLabel = true;
-		}
-		else {
-			targetName = transition.getTargetApp();
-		}
-		transitionStep = context.getBean(getBeanName(targetName, isLabel), Step.class);
-		flowBuilder.on(transition.getStatusToCheck())
-				.to(transitionStep);
-		flowBuilder.from(currentStep);
+		logger.debug("Visit transition:  " + transition);
 	}
 
 	public void postVisit(Transition transition) {
-		System.out.println("postvisit transition " + transition.getTargetApp());
+		logger.debug("Post Visit transition:  " + transition);
 	}
 
 	public FlowBuilder<org.springframework.batch.core.job.flow.Flow> getFlowBuilder() {
-		return flowBuilder;
+		org.springframework.batch.core.job.flow.Flow batchFlow =
+				(org.springframework.batch.core.job.flow.Flow)flowStack.pop();
+		return flowBuilder.start(batchFlow);
 	}
 
 	private void initialize() {
@@ -212,14 +242,41 @@ public class ComposedRunnerVisitor extends ComposedTaskVisitor {
 		}
 	}
 
-	private String getBeanName(String taskName, boolean isLabel) {
-		Integer taskSuffix;
-		if(isLabel) {
-			return taskName;
+	private org.springframework.batch.core.job.flow.Flow getTransitionFlow(String beanName, Step currentStep, List<Transition> transitions) {
+		FlowBuilder<org.springframework.batch.core.job.flow.Flow> taskAppFlow = new
+				FlowBuilder(beanName).from(currentStep);
+		for(Transition transition : transitions) {
+			String transitionName = getBeanName(transition);
+			Step transitionStep = context.getBean(transitionName, Step.class);
+			taskAppFlow.on(transition.getStatusToCheck())
+					.to(transitionStep).from(currentStep);
 		}
+		return taskAppFlow.end();
+	}
+
+
+	private String getBeanName(Transition transition) {
+		if(transition.getTargetLabel() != null) {
+			return transition.getTargetLabel();
+		}
+		return getBeanName(transition.getTargetApp());
+	}
+
+
+	private String getBeanName(TaskApp taskApp) {
+		if(taskApp.getLabel() != null) {
+			return taskApp.getLabel().stringValue();
+		}
+		String taskName = taskApp.getName();
 		if(taskName.contains("->")) {
 			taskName = taskName.substring(taskName.indexOf("->")+2);
 		}
+		return getBeanName(taskName);
+	}
+
+
+	private String getBeanName(String taskName) {
+		Integer taskSuffix;
 		if(taskBeanSuffixes.containsKey(taskName)) {
 			taskSuffix = taskBeanSuffixes.get(taskName);
 		}
@@ -230,4 +287,6 @@ public class ComposedRunnerVisitor extends ComposedTaskVisitor {
 		taskBeanSuffixes.put(taskName, taskSuffix);
 		return result;
 	}
+
+
 }

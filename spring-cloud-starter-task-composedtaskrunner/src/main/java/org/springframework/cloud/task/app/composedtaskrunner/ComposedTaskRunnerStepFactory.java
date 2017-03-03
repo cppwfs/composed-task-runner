@@ -17,8 +17,6 @@
 
 package org.springframework.cloud.task.app.composedtaskrunner;
 
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,10 +28,7 @@ import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
-import org.springframework.cloud.task.repository.TaskExecution;
 import org.springframework.cloud.task.repository.TaskExplorer;
-import org.springframework.cloud.task.repository.TaskRepository;
-import org.springframework.core.env.Environment;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
 import org.springframework.transaction.interceptor.TransactionAttribute;
@@ -68,8 +63,6 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 	@Autowired
 	private TaskExplorer taskExplorer;
 
-
-
 	public ComposedTaskRunnerStepFactory(
 			ComposedTaskProperties composedTaskProperties, String taskName,
 			Map<String, String> taskSpecificProps, List<String> arguments) {
@@ -90,7 +83,8 @@ public class ComposedTaskRunnerStepFactory implements FactoryBean<Step> {
 				this.taskOperations, this.taskExplorer,
 				this.composedTaskProperties, this.taskName, this.taskSpecificProps,
 				this.arguments);
-		String stepName = UUID.randomUUID().toString();
+		String stepName = String.format("%s_%s",taskName,
+				UUID.randomUUID().toString());
 		Step step = this.steps.get(stepName)
 				.tasklet(taskLauncherTasklet)
 				.transactionAttribute(getTransactionAttribute())

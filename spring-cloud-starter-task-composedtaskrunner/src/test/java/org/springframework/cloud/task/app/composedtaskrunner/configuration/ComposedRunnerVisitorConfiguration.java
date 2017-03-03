@@ -18,7 +18,6 @@
 package org.springframework.cloud.task.app.composedtaskrunner.configuration;
 
 import java.util.Set;
-import java.util.UUID;
 
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.Job;
@@ -36,10 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.dataflow.core.dsl.ComposedTaskParser;
 import org.springframework.cloud.dataflow.core.dsl.ComposedTaskValidatorVisitor;
-import org.springframework.cloud.dataflow.core.dsl.TaskParser;
-import org.springframework.cloud.task.app.composedtaskrunner.ComposedRunnerStack;
 import org.springframework.cloud.task.app.composedtaskrunner.ComposedRunnerVisitor;
-import org.springframework.cloud.task.app.composedtaskrunner.TaskLauncherTasklet;
 import org.springframework.cloud.task.app.composedtaskrunner.properties.ComposedTaskProperties;
 import org.springframework.cloud.task.configuration.EnableTask;
 import org.springframework.context.annotation.Bean;
@@ -66,21 +62,21 @@ public class ComposedRunnerVisitorConfiguration {
 	private ComposedTaskProperties composedTaskProperties;
 
 	@Bean
-	public Job job(ComposedRunnerStack composedRunnerStack) {
+	public Job job(ComposedRunnerVisitor composedRunnerVisitor) {
 		ComposedTaskParser taskParser = new ComposedTaskParser();
 		taskParser.parse(composedTaskProperties.getGraph()).accept(new ComposedTaskValidatorVisitor());
-		taskParser.parse(composedTaskProperties.getGraph()).accept(composedRunnerStack);
+		taskParser.parse(composedTaskProperties.getGraph()).accept(composedRunnerVisitor);
 		Set<String> result = taskParser.parse(composedTaskProperties.getGraph()).getTaskApps();
 
 		return jobBuilderFactory.get("job")
-				.start(composedRunnerStack.getFlowBuilder().end()).end()
+				.start(composedRunnerVisitor.getFlowBuilder().end()).end()
 				.build();
 	}
 
 	@Bean
-	public ComposedRunnerStack composedRunnerStack() {
-		ComposedRunnerStack composedRunnerStack = new ComposedRunnerStack();
-		return composedRunnerStack;
+	public ComposedRunnerVisitor composedRunnerStack() {
+		ComposedRunnerVisitor composedRunnerVisitor = new ComposedRunnerVisitor();
+		return composedRunnerVisitor;
 	}
 
 	@Bean
@@ -183,7 +179,6 @@ public class ComposedRunnerVisitorConfiguration {
 				.tasklet(new Tasklet() {
 					@Override
 					public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-						System.out.println(taskName + " Executed");
 						return RepeatStatus.FINISHED;
 					}
 				})
@@ -198,7 +193,6 @@ public class ComposedRunnerVisitorConfiguration {
 				.tasklet(new Tasklet() {
 					@Override
 					public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-						System.out.println(taskName + " Executed");
 						return RepeatStatus.FINISHED;
 					}
 				})

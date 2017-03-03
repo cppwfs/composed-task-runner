@@ -17,16 +17,11 @@
 
 package org.springframework.cloud.task.app.composedtaskrunner;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
-import org.springframework.cloud.dataflow.core.dsl.ComposedTaskNode;
 import org.springframework.cloud.dataflow.core.dsl.ComposedTaskParser;
 import org.springframework.cloud.dataflow.core.dsl.ComposedTaskVisitor;
 import org.springframework.cloud.dataflow.core.dsl.TaskApp;
@@ -55,7 +50,7 @@ public class StepBeanDefinitionRegistrar implements ImportBeanDefinitionRegistra
 		ComposedTaskProperties properties = composedTaskProperties();
 		Map<String, Integer> taskSuffixMap = getTaskApps(taskParser, properties.getGraph());
 		for(String taskName : taskSuffixMap.keySet()) {
-			////handles the possibility that multiple instances of  task definition exist in a composed task
+			//handles the possibility that multiple instances of  task definition exist in a composed task
 			for(int taskSuffix = 0; taskSuffixMap.get(taskName)>= taskSuffix ; taskSuffix++) {
 				BeanDefinitionBuilder builder = BeanDefinitionBuilder.rootBeanDefinition(ComposedTaskRunnerStepFactory.class);
 				builder.addConstructorArgValue(properties);
@@ -136,8 +131,8 @@ public class StepBeanDefinitionRegistrar implements ImportBeanDefinitionRegistra
 		public void visit(Transition transition) {
 			if (transition.isTargetApp()) {
 				if (taskApps.containsKey(transition.getTargetApp())) {
-					Integer count = taskApps.get(transition.getTargetApp()) + 1;
-					count++;
+					Integer updatedCount = taskApps.get(transition.getTargetApp()) + 1;
+					taskApps.put(transition.getTargetApp(), updatedCount);
 				}
 				else {
 					taskApps.put(transition.getTargetApp(), 0);

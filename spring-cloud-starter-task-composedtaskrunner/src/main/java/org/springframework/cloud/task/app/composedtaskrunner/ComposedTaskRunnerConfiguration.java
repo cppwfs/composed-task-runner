@@ -16,17 +16,12 @@
 
 package org.springframework.cloud.task.app.composedtaskrunner;
 
-import java.util.Set;
-import java.util.UUID;
 import javax.sql.DataSource;
 
 import org.springframework.batch.core.Job;
-import org.springframework.batch.core.Step;
 import org.springframework.batch.core.StepExecutionListener;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
-import org.springframework.batch.core.job.builder.FlowBuilder;
-import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.dataflow.core.dsl.ComposedTaskParser;
@@ -41,6 +36,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.util.StringUtils;
 
 /**
  * Configures the Job that will execute the Composed Task Execution.
@@ -66,18 +62,6 @@ public class ComposedTaskRunnerConfiguration {
 	@Autowired
 	private ApplicationContext context;
 
-//	@Bean
-//	public Job job() throws Exception {
-//		//TODO add parser generation of batch flow here
-//		//for now assumes single step until we get parser to build out the flow.
-//		//Each Step is for the graph is uses the task name as the bean name.
-//		FlowBuilder<Flow> flowBuilder = new FlowBuilder<Flow>(UUID.randomUUID().toString())
-//				.start(context.getBean(properties.getGraph(), Step.class));
-//		return this.jobs.get(
-//				properties.getJobNamePrefix() + UUID.randomUUID().toString())
-//				.start(flowBuilder.end()).end().build();
-//	}
-
 	@Bean
 	public TaskRepository taskRepository() {
 		return new SimpleTaskRepository(new TaskExecutionDaoFactoryBean(dataSource));
@@ -94,16 +78,27 @@ public class ComposedTaskRunnerConfiguration {
 	}
 
 	@Bean
-	public Job getComposedTaskJob(ComposedRunnerStack composedRunnerStack) {
+	public Job getComposedTaskJob(ComposedRunnerVisitor composedRunnerVisitor) {
 		ComposedTaskParser taskParser = new ComposedTaskParser();
-		taskParser.parse(properties.getGraph()).accept(composedRunnerStack);
-		return jobs.get(UUID.randomUUID().toString()).start(composedRunnerStack.getFlowBuilder().end()).end().build();
+		taskParser.parse(properties.getGraph()).accept(composedRunnerVisitor);
+
+		return jobs.get(getTaskName()).start(composedRunnerVisitor.getFlowBuilder().end()).end().build();
 	}
 
 	@Bean
-	public ComposedRunnerStack composedRunnerStack() {
-		ComposedRunnerStack composedRunnerStack = new ComposedRunnerStack();
-		return composedRunnerStack;
+	public ComposedRunnerVisitor composedRunnerVisitor() {
+		ComposedRunnerVisitor composedRunnerVisitor = new ComposedRunnerVisitor();
+		return composedRunnerVisitor;
 	}
 
+	 private String getTaskName() {
+		String configuredName = context.getEnvironment().
+				getProperty("spring.cloud.task.name");
+		 if (StringUtils.hasText(configuredName)) {
+			 return configuredName;
+		 }
+		 else {
+			 return context.getId();
+		 }
+	 }
 }

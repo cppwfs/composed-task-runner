@@ -21,8 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
@@ -54,7 +54,7 @@ public class TaskLauncherTasklet implements Tasklet {
 
 	private String taskName;
 
-	private final Logger logger = LoggerFactory.getLogger(TaskLauncherTasklet.class);
+	private static final Log logger = LogFactory.getLog(TaskLauncherTasklet.class);
 
 	public TaskLauncherTasklet(
 			TaskOperations taskOperations, TaskExplorer taskExplorer,

@@ -16,8 +16,8 @@
 
 package org.springframework.cloud.task.app.composedtaskrunner;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.StepExecution;
@@ -38,7 +38,7 @@ public class ComposedTaskStepExecutionListener extends StepExecutionListenerSupp
 
 	private TaskExplorer taskExplorer;
 
-	private final Logger logger = LoggerFactory.getLogger(ComposedTaskStepExecutionListener.class);
+	private static final Log logger = LogFactory.getLog(ComposedTaskStepExecutionListener.class);
 
 	public ComposedTaskStepExecutionListener(TaskExplorer taskExplorer) {
 		Assert.notNull(taskExplorer, "taskExplorer must not be null.");
