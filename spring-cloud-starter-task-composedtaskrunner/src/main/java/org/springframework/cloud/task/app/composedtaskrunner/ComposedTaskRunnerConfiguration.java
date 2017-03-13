@@ -77,12 +77,19 @@ public class ComposedTaskRunnerConfiguration {
 		return new ComposedTaskStepExecutionListener(taskExplorer());
 	}
 
+
 	@Bean
-	public Job getComposedTaskJob(ComposedRunnerVisitor composedRunnerVisitor) {
+	public ComposedRunnerJobBuilder composedRunnerJobBuilder(
+			ComposedRunnerVisitor composedRunnerVisitor) {
 		ComposedTaskParser taskParser = new ComposedTaskParser();
 		taskParser.parse("aname", properties.getGraph()).accept(composedRunnerVisitor);
+		return new ComposedRunnerJobBuilder(composedRunnerVisitor);
+	}
 
-		return jobs.get(getTaskName()).start(composedRunnerVisitor.getFlowBuilder().end()).end().build();
+	@Bean
+	public Job getComposedTaskJob(ComposedRunnerJobBuilder composedRunnerJobBuilder) {
+
+		return jobs.get(getTaskName()).start(composedRunnerJobBuilder.getFlowBuilder().end()).end().build();
 	}
 
 	@Bean
