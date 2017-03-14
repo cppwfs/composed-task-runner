@@ -180,12 +180,14 @@ public class ComposedRunnerJobBuilder {
 			builder.on(transitionNode.getStatusToCheck()).to(transitionStep).from(currentStep);
 		}
 		if(transitionGloballyHandled && !executionStack.isEmpty()) {
-			executionStack.clear();
+			throw new IllegalStateException("Invalid flow following '*' specifier.");
 		}
 		else {
-			if(!jobStack.isEmpty()) {
-				builder.next(jobStack.pop());
-			}
+//			if(!executionStack.isEmpty()) {
+//				builder.on("*").to(executionStack.pop()).from(currentStep);
+
+				//				builder.next(jobStack.pop());
+//			}
 		}
 		executionStack.push(builder.end());
 	}
