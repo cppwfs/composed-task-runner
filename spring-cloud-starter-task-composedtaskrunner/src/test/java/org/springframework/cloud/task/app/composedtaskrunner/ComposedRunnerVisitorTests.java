@@ -158,6 +158,35 @@ public class ComposedRunnerVisitorTests {
 	}
 
 	@Test
+	public void testSequentialTransitionAndSplit() {
+		setupContextForGraph("AAA && FFF 'FAILED' -> EEE && <BBB||CCC> && DDD");
+		Collection<StepExecution> stepExecutions = getStepExecutions();
+		Set<String> stepNames= getStepNames(stepExecutions);
+		assertEquals(5, stepExecutions.size());
+		assertTrue(stepNames.contains("AAA_0"));
+		assertTrue(stepNames.contains("BBB_0"));
+		assertTrue(stepNames.contains("CCC_0"));
+		assertTrue(stepNames.contains("DDD_0"));
+		assertTrue(stepNames.contains("FFF_0"));
+		List<StepExecution> sortedStepExecution =
+				getSortedStepExecutions(stepExecutions);
+		assertEquals("AAA_0", sortedStepExecution.get(0).getStepName());
+		assertEquals("DDD_0", sortedStepExecution.get(4).getStepName());
+	}
+
+	@Test
+	public void testSequentialTransitionAndSplitFailed() {
+		setupContextForGraph("AAA && failedStep 'FAILED' -> EEE '*' -> FFF && <BBB||CCC> && DDD");
+		Collection<StepExecution> stepExecutions = getStepExecutions();
+		Set<String> stepNames= getStepNames(stepExecutions);
+		assertEquals(3, stepExecutions.size());
+		assertTrue(stepNames.contains("AAA_0"));
+		assertTrue(stepNames.contains("failedStep_0"));
+		assertTrue(stepNames.contains("EEE_0"));
+
+	}
+
+	@Test
 	public void testSequentialAndFailedSplit() {
 		setupContextForGraph("AAA && <BBB||failedStep||DDD> && EEE");
 		Collection<StepExecution> stepExecutions = getStepExecutions();

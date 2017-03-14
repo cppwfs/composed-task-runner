@@ -14,9 +14,12 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.dataflow.core.dsl.ComposedTaskParser;
 import org.springframework.cloud.dataflow.core.dsl.FlowNode;
+import org.springframework.cloud.dataflow.core.dsl.LabelledComposedTaskNode;
 import org.springframework.cloud.dataflow.core.dsl.SplitNode;
 import org.springframework.cloud.dataflow.core.dsl.TaskAppNode;
+import org.springframework.cloud.dataflow.core.dsl.TaskParser;
 import org.springframework.cloud.dataflow.core.dsl.TransitionNode;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
@@ -40,16 +43,19 @@ public class ComposedRunnerJobBuilder {
 	@Autowired
 	private ApplicationContext context;
 
-	private Stack flowStack = new Stack();
+	private Stack visitorStack = new Stack();
 
 	private Stack<Flow> jobStack = new Stack();
+
+	private Map<String, Stack<Flow>> flowMap;
 
 	public ComposedRunnerJobBuilder(ComposedRunnerVisitor composedRunnerVisitor) {
 		if(!isInitialized) {
 			flowBuilder = new FlowBuilder<>(UUID.randomUUID().toString());
 			isInitialized = true;
 		}
-		flowStack = composedRunnerVisitor.getFlowStack();
+		visitorStack = composedRunnerVisitor.getFlowStack();
+		flowMap = new HashMap<>();
 	}
 
 
@@ -59,10 +65,10 @@ public class ComposedRunnerJobBuilder {
 
 	private Flow createFlow() {
 		Stack<Flow> executionStack = new Stack();
-		while(!flowStack.isEmpty()) {
-			logger.debug(flowStack.peek());
-			if(flowStack.peek() instanceof TaskAppNode) {
-				TaskAppNode taskAppNode = (TaskAppNode)flowStack.pop();
+		while(!visitorStack.isEmpty()) {
+			logger.debug(visitorStack.peek());
+			if(visitorStack.peek() instanceof TaskAppNode) {
+				TaskAppNode taskAppNode = (TaskAppNode) visitorStack.pop();
 				if(taskAppNode.hasTransitions()) {
 					handleTransition(executionStack, taskAppNode);
 				}
@@ -71,10 +77,10 @@ public class ComposedRunnerJobBuilder {
 							getTaskAppFlow(taskAppNode));
 				}
 			}
-			else if(flowStack.peek() instanceof SplitNode) {
-				handleSplit(executionStack, (SplitNode)flowStack.pop());
+			else if(visitorStack.peek() instanceof SplitNode) {
+				handleSplit(executionStack, (SplitNode) visitorStack.pop());
 			}
-			else if(flowStack.peek() instanceof FlowNode) {
+			else if(visitorStack.peek() instanceof FlowNode) {
 				handleFlow(executionStack);
 			}
 		}
@@ -92,23 +98,72 @@ public class ComposedRunnerJobBuilder {
 				flowBuilder.next(executionStack.pop());
 			}
 		}
-		flowStack.pop();
+		visitorStack.pop();
 		jobStack.push(flowBuilder.end());
+	}
+
+	private void handleFlowForSplit(Stack<Flow> executionStack, Stack<Flow> resultStack) {
+		boolean isFirst = true;
+		FlowBuilder<Flow> localTaskAppFlowBuilder =
+				new FlowBuilder("Flow" + UUID.randomUUID().toString());
+		while(!executionStack.isEmpty()) {
+			if(isFirst) {
+				localTaskAppFlowBuilder.start(executionStack.pop());
+				isFirst = false;
+			}
+			else {
+				localTaskAppFlowBuilder.next(executionStack.pop());
+			}
+		}
+		resultStack.push(localTaskAppFlowBuilder.end());
 	}
 
 	private void handleSplit(Stack<Flow> executionStack, SplitNode splitNode) {
 		FlowBuilder<Flow> taskAppFlowBuilder =
 				new FlowBuilder("Flow" + UUID.randomUUID().toString());
 		List<Flow> flows = new ArrayList<>();
-		while (!executionStack.isEmpty()){
-			flows.add(executionStack.pop());
+		for(LabelledComposedTaskNode splitElement : splitNode.getSeries()) {
+			Stack<Flow> elementFlowStack = processSplitFlow(splitElement);
+			while (!elementFlowStack.isEmpty()) {
+				flows.add(elementFlowStack.pop());
+			}
 		}
 		Flow splitFlow = new FlowBuilder.SplitBuilder<>(
 						new FlowBuilder<Flow>("Split"+UUID.randomUUID().toString()),
 						new SimpleAsyncTaskExecutor())
 						.add(flows.toArray(new Flow[flows.size()])).build();
+		while(!(visitorStack.peek() instanceof SplitNode)) {
+			visitorStack.pop();
+		}
+		visitorStack.pop(); // pop the visitor stack
+		executionStack.push(taskAppFlowBuilder.start(splitFlow).end());
+	}
 
-		executionStack.push(taskAppFlowBuilder.next(splitFlow).end());
+	private Stack<Flow> processSplitFlow(LabelledComposedTaskNode node) {
+		ComposedTaskParser taskParser = new ComposedTaskParser();
+		ComposedRunnerVisitor splitElementVisitor = new ComposedRunnerVisitor();
+		taskParser.parse("aname", node.stringify()).accept(splitElementVisitor);
+		Stack splitElmentStack = splitElementVisitor.getFlowStack();
+		Stack<Flow> elementFlowStack = new Stack<>();
+		Stack<Flow> resultFlowStack = new Stack<>();
+		while(!splitElmentStack.isEmpty()) {
+			System.out.println(splitElmentStack.peek());
+			if(splitElmentStack.peek() instanceof TaskAppNode) {
+				TaskAppNode taskAppNode = (TaskAppNode) splitElmentStack.pop();
+				if(taskAppNode.hasTransitions()) {
+					handleTransition(elementFlowStack, taskAppNode);
+				}
+				else {
+					elementFlowStack.push(
+							getTaskAppFlow(taskAppNode));
+				}
+			}
+			else if(splitElmentStack.peek() instanceof FlowNode) {
+				handleFlowForSplit(elementFlowStack, resultFlowStack);
+				splitElmentStack.pop();
+			}
+		}
+		return resultFlowStack;
 	}
 
 	private void handleTransition(Stack<Flow> executionStack, TaskAppNode taskAppNode) {

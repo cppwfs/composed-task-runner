@@ -103,6 +103,8 @@ public class ComposedRunnerVisitor extends ComposedTaskVisitor {
 
 	public void postVisit(SplitNode split) {
 		logger.debug("Post Visit Split:  " + split);
+		flowStack.push(split);
+
 	}
 
 	/**
