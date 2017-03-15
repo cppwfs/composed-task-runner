@@ -184,6 +184,7 @@ public class ComposedRunnerVisitorTests {
 			validateInvalidFlowWildCard(bce);
 		}
 	}
+
 	@Test
 	public void testSequentialTransitionAndSplitFailed() {
 		setupContextForGraph("AAA && failedStep 'FAILED' -> EEE && FFF && <BBB||CCC> && DDD");
@@ -255,14 +256,19 @@ public class ComposedRunnerVisitorTests {
 		}
 	}
 
-	//@Test
-	public void testFailBasicTransitionWithSequence() {// failing because DDD & EEE are fired.
-		setupContextForGraph("failedStep 'FAILED' -> BBB * -> CCC && DDD && EEE");
+	@Test
+	public void testSuccessBasicTransitionWithTransition() {
+		setupContextForGraph("AAA 'FAILED' -> BBB && CCC 'FAILED' -> DDD '*' -> EEE");
 		Collection<StepExecution> stepExecutions = getStepExecutions();
 		Set<String> stepNames= getStepNames(stepExecutions);
-		assertEquals(2, stepExecutions.size());
-		assertTrue(stepNames.contains("failedStep_0"));
-		assertTrue(stepNames.contains("BBB_0"));
+		assertEquals(3, stepExecutions.size());
+		assertTrue(stepNames.contains("AAA_0"));
+		assertTrue(stepNames.contains("CCC_0"));
+		assertTrue(stepNames.contains("EEE_0"));
+		List<StepExecution> sortedStepExecution =
+				getSortedStepExecutions(stepExecutions);
+		assertEquals("AAA_0", sortedStepExecution.get(0).getStepName());
+		assertEquals("EEE_0", sortedStepExecution.get(2).getStepName());
 	}
 
 	@Test
@@ -276,15 +282,28 @@ public class ComposedRunnerVisitorTests {
 	}
 
 	@Test
+	public void testWildCardOnlyInLastPosition() {
+			setupContextForGraph("AAA 'FAILED' -> BBB && CCC * -> DDD ");
+		Collection<StepExecution> stepExecutions = getStepExecutions();
+		Set<String> stepNames= getStepNames(stepExecutions);
+		assertEquals(3, stepExecutions.size());
+		assertTrue(stepNames.contains("AAA_0"));
+		assertTrue(stepNames.contains("CCC_0"));
+		assertTrue(stepNames.contains("DDD_0"));
+		List<StepExecution> sortedStepExecution =
+				getSortedStepExecutions(stepExecutions);
+		assertEquals("AAA_0", sortedStepExecution.get(0).getStepName());
+		assertEquals("DDD_0", sortedStepExecution.get(2).getStepName());
+	}
+
+
+	@Test
 	public void failedStepTransitionWithDuplicateTaskNameTest() {//should fail because bbb should fire then stop.
 		setupContextForGraph("failedStep 'FAILED' -> BBB  && CCC && BBB && EEE");
 		Collection<StepExecution> stepExecutions = getStepExecutions();
 		Set<String> stepNames= getStepNames(stepExecutions);
-		assertEquals(5, stepExecutions.size());
-		assertTrue(stepNames.contains("CCC_0"));
-		assertTrue(stepNames.contains("EEE_0"));
+		assertEquals(2, stepExecutions.size());
 		assertTrue(stepNames.contains("failedStep_0"));
-		assertTrue(stepNames.contains("BBB_0"));
 		assertTrue(stepNames.contains("BBB_1"));
 		List<StepExecution> sortedStepExecution =
 				getSortedStepExecutions(stepExecutions);
