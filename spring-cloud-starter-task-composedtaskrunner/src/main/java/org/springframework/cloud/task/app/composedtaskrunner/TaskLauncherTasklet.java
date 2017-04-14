@@ -26,6 +26,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
+import org.springframework.batch.core.step.tasklet.StoppableTasklet;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.repeat.RepeatStatus;
@@ -42,7 +43,7 @@ import org.springframework.util.Assert;
  *
  * @author Glenn Renfro
  */
-public class TaskLauncherTasklet implements Tasklet {
+public class TaskLauncherTasklet implements StoppableTasklet {
 
 	private ComposedTaskProperties composedTaskProperties;
 
@@ -57,6 +58,8 @@ public class TaskLauncherTasklet implements Tasklet {
 	private String taskName;
 
 	private static final Log logger = LogFactory.getLog(TaskLauncherTasklet.class);
+
+	private boolean isStopRequested = false;
 
 
 	public TaskLauncherTasklet(
@@ -137,7 +140,7 @@ public class TaskLauncherTasklet implements Tasklet {
 		logger.debug("Interval check time for this task to complete is " +
 				this.composedTaskProperties.getIntervalTimeBetweenChecks());
 
-		while (!isComplete) {
+		while (!isComplete && !this.isStopRequested) {
 			try {
 				Thread.sleep(this.composedTaskProperties.getIntervalTimeBetweenChecks());
 			}
@@ -161,4 +164,8 @@ public class TaskLauncherTasklet implements Tasklet {
 		return isSuccessful;
 	}
 
+	@Override
+	public void stop() {
+		this.isStopRequested = true;
+	}
 }
